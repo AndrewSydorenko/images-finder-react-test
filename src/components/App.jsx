@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from './modal/Modal';
 import ImageGallery from './imageGallery/ImageGallery';
 import Searchbar from './searchbar/Searchbar';
@@ -6,93 +6,70 @@ import Button from './button/Button';
 import { fetchImages } from './servises/images-api';
 import Loader from './loader/Loader';
 
-export class App extends Component {
-  state = {
-    hits: [],
-    currentPage: 1,
-    searchQuery: '',
-    isLoading: false,
-    error: null,
-    showModal: false,
-    largeImageURL: '',
-  };
+function App() {
+  const [hits, setHits] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
 
-  componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.searchQuery !== this.state.searchQuery ||
-      prevState.currentPage !== this.state.currentPage
-    ) {
-      this.fetchImages();
-    }
-  }
-
-  onChangeQuery = query => {
-    this.setState({
-      searchQuery: query,
-      currentPage: 1,
-      hits: [],
-      error: null,
-    });
-  };
-
-  fetchImages = () => {
-    const { currentPage, searchQuery } = this.state;
-
-    this.setState({ isLoading: true });
+  useEffect(() => {
+    setIsLoading(true);
     fetchImages(searchQuery, currentPage)
       .then(({ hits, totalHits }) => {
         if (totalHits === 0) {
-          return Promise.reject(
-            new Error(
-              `Sorry, we couldn't find any hits for your search "${searchQuery}"`
-            )
+          throw new Error(
+            `"Sorry, we couldn't find any hits for your search "${searchQuery}"`
           );
         }
-
-        this.setState(prevState => ({
-          hits: [...prevState.hits, ...hits],
-        }));
+        setHits(prevHits => [...prevHits, ...hits]);
       })
-      .catch(error => this.setState({ error: error.message }))
-      .finally(() => this.setState({ isLoading: false }));
+      .catch(error => setError(error.message))
+      .finally(() => setIsLoading(false));
+  }, [searchQuery, currentPage]);
+
+  const onChangeQuery = query => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+    setHits([]);
+    setError(null);
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
+  const handleLoadMore = () => {
+    setCurrentPage(prevPage => prevPage + 1);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
-  };
-  openModal = url => {
-    this.setState({ largeImageURL: url });
-    this.toggleModal();
+  const openModal = url => {
+    setLargeImageURL(url);
+    setShowModal(true);
   };
 
-  render() {
-    const { hits, isLoading, error, showModal, largeImageURL } = this.state;
-    return (
-      <div className="App">
-        <Searchbar onSubmit={this.onChangeQuery} />
+  const toggleModal = () => {
+    setShowModal(prevShowModal => !prevShowModal);
+  };
 
-        {error && <h2 className="error">{error}</h2>}
+  return (
+    <div className="App">
+      <Searchbar onSubmit={onChangeQuery} />
+      {error && <h2 className="error">{error}</h2>}
 
-        <ImageGallery hits={hits} onImageClick={this.openModal} />
+      <ImageGallery hits={hits} onImageClick={openModal} />
 
-        {isLoading && <Loader />}
+      {isLoading && <Loader />}
 
-        {this.state.hits.length > 0 && !isLoading && (
-          <Button onClick={this.handleLoadMore} />
-        )}
+      {hits.length > 0 && !isLoading && <Button onClick={handleLoadMore} />}
 
-        {showModal && (
-          <Modal onClose={this.toggleModal} largeImageURL={largeImageURL}>
-            <button type="button" onClick={this.toggleModal}>
-              Close
-            </button>
-          </Modal>
-        )}
-      </div>
-    );
-  }
+      {showModal && (
+        <Modal onClose={toggleModal} largeImageURL={largeImageURL}>
+          <button type="button" onClick={toggleModal}>
+            Close
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
 }
+
+export default App;
